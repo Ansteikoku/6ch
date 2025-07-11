@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -28,10 +27,14 @@
     async function loadBoards() {
       const ul = document.getElementById("board-list");
       const { data, error } = await supabase.from("boards").select("*").order("name");
+      
+      console.log(data, error);  // データとエラーを確認
+
       if (error || !data) {
         ul.innerHTML = "<li>読み込み失敗</li>";
         return;
       }
+
       ul.innerHTML = "";
       data.forEach(board => {
         const li = document.createElement("li");
