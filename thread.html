@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>６ちゃんねる - スレッド詳細</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    #thread-title { font-weight: bold; font-size: 1.5em; margin-bottom: 10px; }
+    #thread-body { margin-bottom: 20px; }
+    #comments { background: #fff; padding: 10px; border: 1px solid #ccc; max-height: 400px; overflow-y: auto; }
+    .comment { border-bottom: 1px solid #ddd; padding: 5px 0; }
+    .comment:last-child { border-bottom: none; }
+    #comment-form textarea { width: 100%; height: 80px; }
+  </style>
+</head>
+<body>
+  <h1 id="thread-title">読み込み中...</h1>
+  <div id="thread-body"></div>
+
+  <h2>コメント一覧</h2>
+  <div id="comments">コメントを読み込み中...</div>
+
+  <h3>コメント投稿</h3>
+  <form id="comment-form">
+    <input type="text" id="comment-name" placeholder="名前（省略可）" /><br />
+    <textarea id="comment-body" placeholder="コメント本文" required></textarea><br />
+        <button type="submit">コメント投稿</button>
+  </form>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const supabase = createClient(
+      "https://jusddwcwoccwzimnveys.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1c2Rkd2N3b2Njd3ppbW52ZXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMDE1ODAsImV4cCI6MjA2Nzc3NzU4MH0.NQXUcKkOeQ898bSyUJbPTgGTdTdotcVIKV6wTVsBPjg"
+    );
+
+    // URLからクエリパラメータのidを取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const threadId = urlParams.get('id');
+
+    const threadTitleEl = document.getElementById('thread-title');
+    const threadBodyEl = document.getElementById('thread-body');
+    const commentsEl = document.getElementById('comments');
+    const commentForm = document.getElementById('comment-form');
+
+    if (!threadId) {
+      threadTitleEl.textContent = 'スレッドIDが指定されていません';
+      throw new Error('No thread id');
+    }
+
+    // スレッド情報を読み込み表示
+    async function loadThread() {
+      const { data, error } = await supabase
+        .from('threads')
+        .select('*')
+        .eq('id', threadId)
+        .single();
+
+      if (error || !data) {
+        threadTitleEl.textContent = 'スレッドが見つかりません';
+        console.error(error);
+        return;
+      }
+
+      threadTitleEl.textContent = data.title;
+      threadBodyEl.textContent = data.body;
+    }
+
+    // コメント一覧を読み込み表示
+    async function loadComments() {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        commentsEl.textContent = 'コメントの読み込みに失敗しました';
+        console.error(error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        commentsEl.textContent = 'コメントはまだありません';
+        return;
+      }
+
+      commentsEl.innerHTML = '';
+      data.forEach(comment => {
+        const div = document.createElement('div');
+        div.className = 'comment';
+        const name = comment.name || '名無しさん';
+        const time = new Date(comment.created_at).toLocaleString();
+        div.innerHTML = `
+          <strong>${name}</strong> <small>${time}</small><br>
+          <pre style="white-space: pre-wrap;">${escapeHtml(comment.body)}</pre>
+        `;
+        commentsEl.appendChild(div);
+      });
+    }
+
+    // HTMLエスケープ関数
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // 新しいコメントだけをDOMに追加（リアルタイム用）
+    function appendComment(comment) {
+      if (!comment) return;
+      const div = document.createElement('div');
+      div.className = 'comment';
+      const name = comment.name || '名無しさん';
+      const time = new Date(comment.created_at).toLocaleString();
+      div.innerHTML = `
+        <strong>${name}</strong> <small>${time}</small><br>
+        <pre style="white-space: pre-wrap;">${escapeHtml(comment.body)}</pre>
+      `;
+      commentsEl.appendChild(div);
+      commentsEl.scrollTop = commentsEl.scrollHeight; // 下までスクロール
+    }
+
+    // コメントフォーム送信
+    commentForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('comment-name').value || '名無しさん';
+      const body = document.getElementById('comment-body').value.trim();
+      
+      if (!body) {
+        alert('コメントを入力してください');
+        return;
+      }
+      if (!) {
+        alert('削除用パスワードを入力してください');
+        return;
+      }
+
+      const { error } = await supabase.from('comments').insert([{
+        thread_id: threadId,
+        name,
+        body,
+        
+      }]);
+
+      if (error) {
+        alert('コメント投稿に失敗しました');
+        console.error(error);
+        return;
+      }
+
+      // 投稿成功したらフォームクリア
+      commentForm.reset();
+      // コメントを再読み込み（即時反映用）
+      await loadComments();
+    });
+
+    // リアルタイム監視して新規コメントを即時表示
+    function subscribeComments() {
+      supabase
+        .channel('public:comments')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'comments', filter: `thread_id=eq.${threadId}` },
+          payload => {
+            const newComment = payload.new;
+            appendComment(newComment);
+          }
+        )
+        .subscribe();
+    }
+
+    // 初期ロード
+    loadThread();
+    loadComments();
+    subscribeComments();
+
+  </script>
+</body>
+</html>に読み込みを追加

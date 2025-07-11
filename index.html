@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>６ちゃんねる - ホーム</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    .search-bar {
+      margin: 20px auto;
+      max-width: 500px;
+    }
+    .search-bar input {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    .section {
+      margin-top: 30px;
+      text-align: left;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .thread, .board {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+    .thread:last-child, .board:last-child {
+      border-bottom: none;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.5em; }
+      .search-bar input { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>６ちゃんねる</h1>
+
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="キーワード検索..." />
+  </div>
+
+  <div class="section" id="popular-threads-section">
+    <h2>人気スレッド</h2>
+    <div id="popular-threads">読み込み中...</div>
+  </div>
+
+  <div class="section" id="recent-threads-section">
+    <h2>新着スレッド</h2>
+    <div id="recent-threads">読み込み中...</div>
+  </div>
+
+  <div class="section" id="popular-boards-section">
+    <h2>人気板</h2>
+    <div id="popular-boards">読み込み中...</div>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const supabase = createClient(
+      "https://jusddwcwoccwzimnveys.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1c2Rkd2N3b2Njd3ppbW52ZXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMDE1ODAsImV4cCI6MjA2Nzc3NzU4MH0.NQXUcKkOeQ898bSyUJbPTgGTdTdotcVIKV6wTVsBPjg"
+    );
+
+    async function loadRecentThreads() {
+      const container = document.getElementById("recent-threads");
+      const { data, error } = await supabase
+        .from("threads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error || !data) {
+        container.textContent = "読み込み失敗";
+        return;
+      }
+      container.innerHTML = "";
+      data.forEach(thread => {
+        const el = document.createElement("div");
+        el.className = "thread";
+        el.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br><small>${thread.body}</small>`;
+        container.appendChild(el);
+      });
+    }
+
+    async function loadPopularThreads() {
+      const container = document.getElementById("popular-threads");
+      const { data, error } = await supabase.rpc("get_popular_threads");
+      if (error || !data) {
+        container.textContent = "読み込み失敗";
+        return;
+      }
+      container.innerHTML = "";
+      data.forEach(thread => {
+        const el = document.createElement("div");
+        el.className = "thread";
+        el.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br><small>${thread.body}</small>`;
+        container.appendChild(el);
+      });
+    }
+
+    async function loadPopularBoards() {
+      const container = document.getElementById("popular-boards");
+      const { data, error } = await supabase
+        .from("boards")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error || !data) {
+        container.textContent = "読み込み失敗";
+        return;
+      }
+      container.innerHTML = "";
+      data.forEach(board => {
+        const el = document.createElement("div");
+        el.className = "board";
+        el.innerHTML = `<a href="board.html?board=${board.slug}">${board.name}</a>`;
+        container.appendChild(el);
+      });
+    }
+
+    document.getElementById("search-input").addEventListener("input", async (e) => {
+      const keyword = e.target.value.trim();
+      if (!keyword) return;
+      window.location.href = `board.html?search=${encodeURIComponent(keyword)}`;
+    });
+
+    loadRecentThreads();
+    loadPopularThreads();
+    loadPopularBoards();
+  </script>
+
+  <div class="section" id="search-history-section">
+    <h2>検索履歴</h2>
+    <div id="search-history">履歴はありません</div>
+  </div>
+
+  <script type="module">
+    const searchInput = document.getElementById("search-input");
+    const historyContainer = document.getElementById("search-history");
+
+    // 検索履歴の保存・表示
+    function saveSearchHistory(keyword) {
+      if (!keyword) return;
+      let history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+      history = history.filter(k => k !== keyword); // 重複排除
+      history.unshift(keyword);
+      if (history.length > 10) history = history.slice(0, 10);
+      localStorage.setItem("searchHistory", JSON.stringify(history));
+      renderSearchHistory();
+    }
+
+    function renderSearchHistory() {
+      let history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+      if (!history.length) {
+        historyContainer.textContent = "履歴はありません";
+        return;
+      }
+      historyContainer.innerHTML = "";
+      history.forEach(word => {
+        const el = document.createElement("div");
+        el.innerHTML = `<a href="board.html?search=${encodeURIComponent(word)}">${word}</a>`;
+        historyContainer.appendChild(el);
+      });
+    }
+
+    // 曖昧一致で即時ジャンプ
+    searchInput.addEventListener("keypress", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const keyword = searchInput.value.trim();
+        if (keyword) {
+          saveSearchHistory(keyword);
+          window.location.href = `board.html?search=${encodeURIComponent(keyword)}`;
+        }
+      }
+    });
+
+    renderSearchHistory();
+  </script>
+</body>
+
+</html>
