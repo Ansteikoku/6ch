@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>６ちゃんねる</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    .thread { padding: 10px; background: #fff; margin: 10px 0; border: 1px solid #ccc; }
+    #board-tabs button { margin: 0 5px; }
+    #user-area { margin-bottom: 10px; }
+    input[type="file"] { margin-top: 10px; }
+    #thread-error { color: red; font-weight: bold; margin-top: 10px; }
+
+    /* モーダル用のスタイル */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.8);
+    }
+    .modal-content {
+      margin: auto;
+      display: block;
+      width: 80%;
+      max-width: 700px;
+    }
+    .modal-content:hover {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>６ちゃんねる</h1>
+
+  
+
+  <div id="board-tabs">読み込み中...</div>
+  <div id="threads"></div>
+
+  <h2>スレッド作成</h2>
+  <form id="thread-form">
+    <input type="text" id="title" placeholder="タイトル" required /><br />
+    <textarea id="body" placeholder="本文" required></textarea><br />
+    <input type="text" id="name" placeholder="名前（省略可）" /><br />
+        <input type="file" id="thread-image" accept="image/*" /><br />
+    <button type="submit">作成</button>
+  </form>
+
+  <!-- エラー表示 -->
+  <div id="thread-error"></div>
+
+  <!-- モーダル画像表示 -->
+  <div id="imgModal" class="modal">
+    <span id="close-modal" style="color: white; font-size: 30px; cursor: pointer; position: absolute; top: 10px; right: 25px;">×</span>
+    <img id="modal-img" class="modal-content" />
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+    const supabase = createClient(
+      "https://jusddwcwoccwzimnveys.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1c2Rkd2N3b2Njd3ppbW52ZXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMDE1ODAsImV4cCI6MjA2Nzc3NzU4MH0.NQXUcKkOeQ898bSyUJbPTgGTdTdotcVIKV6wTVsBPjg"
+    );
+
+    let currentBoard = null;
+
+    function updateLoginStatus() {
+      const isAdmin = localStorage.getItem("isAdmin") === "true";
+      const isUser = localStorage.getItem("isUser") === "true";
+      const loginStatus = document.getElementById("login-status");
+      if (isAdmin) loginStatus.textContent = "管理者ログイン中";
+      else if (isUser) loginStatus.textContent = "ログイン中";
+      else loginStatus.textContent = "未ログイン";
+
+            document.getElementById("user-").style.display = isAdmin || isUser ? "none" : "inline-block";
+          }
+
+          if (pw === "wakakusanagisa") {
+        localStorage.setItem("isAdmin", "true");
+        alert("管理者としてログインしました");
+      } else if (pw === "wakakusa") {
+        localStorage.setItem("isUser", "true");
+        alert("通常ユーザーとしてログインしました");
+      } else {
+        alert("パスワードが間違っています");
+        return;
+      }
+      
+    };
+
+          localStorage.removeItem("isUser");
+      alert("ログアウトしました");
+      
+    };
+
+    async function loadBoards() {
+      const tabEl = document.getElementById("board-tabs");
+      const { data, error } = await supabase.from("boards").select("*");
+      if (error || !data) {
+        tabEl.textContent = "板情報の読み込み失敗";
+        return;
+      }
+      tabEl.innerHTML = '';
+      data.forEach(board => {
+        const btn = document.createElement("button");
+        btn.textContent = board.name;
+        btn.onclick = () => {
+          currentBoard = board.slug;
+          loadThreads();
+        };
+        tabEl.appendChild(btn);
+      });
+      if (data.length > 0) {
+        currentBoard = data[0].slug;
+        loadThreads();
+      }
+    }
+
+    
+    
+    function highlight(text, keyword) {
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\]/g, '\$&');
+      return text.replace(new RegExp(escaped, "gi"), match => `<mark>${match}</mark>`);
+    }
+
+async function loadThreads() {
+      const container = document.getElementById("threads");
+      container.innerHTML = "";
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const searchKeyword = searchParams.get("search");
+      let query = supabase.from("threads").select("*").order("created_at", { ascending: false });
+
+      if (currentBoard) {
+        query = query.eq("board_slug", currentBoard);
+      }
+
+      if (searchKeyword) {
+        query = query.or(`title.ilike.%${searchKeyword}%,body.ilike.%${searchKeyword}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        container.textContent = "スレッド読み込みに失敗しました";
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        container.textContent = "スレッドが見つかりません";
+        return;
+      }
+
+      data.forEach(thread => {
+        const div = document.createElement("div");
+        div.className = "thread";
+        div.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br>${thread.body}`;
+        container.appendChild(div);
+      });
+    }
+    }
+
+    document.getElementById("thread-form").addEventListener("submit", async (e) => {
+      const errorDiv = document.getElementById("thread-error");
+      errorDiv.textContent = "";
+
+      if (!(localStorage.getItem("isUser") === "true" || localStorage.getItem("isAdmin") === "true")) {
+        errorDiv.textContent = "ログインが必要です。先にログインしてください。";
+        return;
+      }
+
+      e.preventDefault();
+      const title = document.getElementById("title").value;
+      const body = document.getElementById("body").value;
+      const name = document.getElementById("name").value || "名無しさん";
+      const  = document.getElementById("").value;
+      const imageFile = document.getElementById("thread-image").files[0];
+
+      let imageUrl = null;
+      if (imageFile) {
+        if (imageFile.size > 2 * 1024 * 1024) {
+          errorDiv.textContent = "画像は2MB以内にしてください。";
+          return;
+        }
+
+        const ext = imageFile.name.split(".").pop();
+        const fileName = `${Date.now()}.${ext}`;
+        try {
+          const { error: uploadErr } = await supabase.storage
+            .from("post-images")
+            .upload(fileName, imageFile);
+
+          if (uploadErr) {
+            console.error("画像アップロードエラー:", uploadErr);
+            errorDiv.textContent = "画像のアップロードに失敗：" + uploadErr.message;
+            return;
+          }
+
+          const { data: publicUrlData } = supabase.storage
+            .from("post-images")
+            .getPublicUrl(fileName);
+          imageUrl = publicUrlData.publicUrl;
+        } catch (err) {
+          console.error("アップロード処理エラー:", err);
+          errorDiv.textContent = "画像のアップロード中にエラーが発生：" + err.message;
+          return;
+        }
+      }
+
+      const { error } = await supabase.from("threads").insert({
+        board_slug: currentBoard,
+        title, body, name,  image_url: imageUrl
+      });
+
+      if (error) {
+        console.error("スレッド作成エラー:", error);
+        errorDiv.textContent = "スレッド作成に失敗：" + (error.message || "不明なエラー");
+        return;
+      }
+
+      errorDiv.textContent = "";
+      e.target.reset();
+      loadThreads();
+    });
+
+    // モーダル画像表示
+    const modal = document.getElementById("imgModal");
+    const modalImg = document.getElementById("modal-img");
+
+    document.body.addEventListener("click", (event) => {
+      if (event.target.classList.contains("comment-img")) {
+        modal.style.display = "block";
+        modalImg.src = event.target.src;
+      }
+    });
+
+    document.getElementById("close-modal").onclick = () => {
+      modal.style.display = "none";
+    };
+
+    loadBoards();
+    
+  </script>
+</body>
+</html>
