@@ -1,85 +1,69 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>６ちゃんねる - ホーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       font-family: sans-serif;
-      background: #f0f0f0;
-      margin: 0;
       padding: 20px;
-      text-align: center;
+      background: #f0f0f0;
     }
     h1 {
       font-size: 2em;
-      margin-bottom: 20px;
-    }
-    .search-bar {
-      margin: 20px auto;
-      max-width: 500px;
-    }
-    .search-bar input {
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
     }
     .section {
       margin-top: 30px;
-      text-align: left;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
     }
-    .thread, .board {
-      border-bottom: 1px solid #eee;
-      padding: 10px 0;
+    .thread {
+      background: #fff;
+      padding: 10px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
     }
-    .thread:last-child, .board:last-child {
-      border-bottom: none;
+    ul#board-list {
+      padding-left: 20px;
     }
-    a {
-      color: #007bff;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-
     @media (max-width: 600px) {
-      h1 { font-size: 1.5em; }
-      .search-bar input { font-size: 14px; }
+      body {
+        padding: 10px;
+      }
+      input[type="text"],
+      textarea,
+      button {
+        width: 100% !important;
+        box-sizing: border-box;
+        font-size: 16px;
+      }
+      .thread {
+        font-size: 14px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>６ちゃんねる</h1>
+  <h1>６ちゃんねる - スレッド一覧</h1>
 
-  <div class="search-bar">
-    <input type="text" id="search-input" placeholder="キーワード検索..." />
+  <div class="section">
+    <h2>板一覧</h2>
+    <ul id="board-list">読み込み中...</ul>
   </div>
 
-  <div class="section" id="popular-threads-section">
-    <h2>人気スレッド</h2>
-    <div id="popular-threads">読み込み中...</div>
+  <div class="section">
+    <h2>スレッド一覧</h2>
+    <div id="threads">読み込み中...</div>
   </div>
 
-  <div class="section" id="recent-threads-section">
-    <h2>新着スレッド</h2>
-    <div id="recent-threads">読み込み中...</div>
-  </div>
-
-  <div class="section" id="popular-boards-section">
-    <h2>人気板</h2>
-    <div id="popular-boards">読み込み中...</div>
+  <div class="section">
+    <h2>スレッド作成</h2>
+    <form id="thread-form">
+      <input type="text" id="title" placeholder="タイトル" required /><br />
+      <textarea id="body" placeholder="本文" required></textarea><br />
+      <input type="text" id="name" placeholder="投稿者名（省略可）" /><br />
+      <button type="submit">作成</button>
+      <div id="error" style="color: red;"></div>
+    </form>
   </div>
 
   <script type="module">
@@ -87,124 +71,106 @@
 
     const supabase = createClient(
       "https://jusddwcwoccwzimnveys.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1c2Rkd2N3b2Njd3ppbW52ZXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMDE1ODAsImV4cCI6MjA2Nzc3NzU4MH0.NQXUcKkOeQ898bSyUJbPTgGTdTdotcVIKV6wTVsBPjg"
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
     );
 
-    async function loadRecentThreads() {
-      const container = document.getElementById("recent-threads");
-      const { data, error } = await supabase
-        .from("threads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error || !data) {
-        container.textContent = "読み込み失敗";
-        return;
-      }
-      container.innerHTML = "";
-      data.forEach(thread => {
-        const el = document.createElement("div");
-        el.className = "thread";
-        el.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br><small>${thread.body}</small>`;
-        container.appendChild(el);
-      });
-    }
+    let currentBoard = null;
 
-    async function loadPopularThreads() {
-      const container = document.getElementById("popular-threads");
-      const { data, error } = await supabase.rpc("get_popular_threads");
-      if (error || !data) {
-        container.textContent = "読み込み失敗";
-        return;
-      }
-      container.innerHTML = "";
-      data.forEach(thread => {
-        const el = document.createElement("div");
-        el.className = "thread";
-        el.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br><small>${thread.body}</small>`;
-        container.appendChild(el);
-      });
-    }
+    async function loadBoards() {
+      const ul = document.getElementById("board-list");
+      const { data, error } = await supabase.from("boards").select("*").order("name");
 
-    async function loadPopularBoards() {
-      const container = document.getElementById("popular-boards");
-      const { data, error } = await supabase
-        .from("boards")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
       if (error || !data) {
-        container.textContent = "読み込み失敗";
+        ul.innerHTML = "<li>読み込み失敗</li>";
         return;
       }
-      container.innerHTML = "";
+
+      ul.innerHTML = "";
+      const searchParams = new URLSearchParams(window.location.search);
+      const boardParam = searchParams.get("board");
+
       data.forEach(board => {
-        const el = document.createElement("div");
-        el.className = "board";
-        el.innerHTML = `<a href="board.html?board=${board.slug}">${board.name}</a>`;
-        container.appendChild(el);
+        const li = document.createElement("li");
+        const active = boardParam === board.slug;
+        li.innerHTML = `<a href="?board=${board.slug}" style="${active ? 'font-weight:bold;' : ''}">${board.name}</a>`;
+        ul.appendChild(li);
       });
+
+      if (boardParam) currentBoard = boardParam;
+      loadThreads();
     }
 
-    document.getElementById("search-input").addEventListener("input", async (e) => {
-      const keyword = e.target.value.trim();
-      if (!keyword) return;
-      window.location.href = `board.html?search=${encodeURIComponent(keyword)}`;
-    });
+    async function loadThreads() {
+      const container = document.getElementById("threads");
+      container.innerHTML = "";
 
-    loadRecentThreads();
-    loadPopularThreads();
-    loadPopularBoards();
-  </script>
+      const searchParams = new URLSearchParams(window.location.search);
+      const searchKeyword = searchParams.get("search");
+      let query = supabase.from("threads").select("*").order("created_at", { ascending: false });
 
-  <div class="section" id="search-history-section">
-    <h2>検索履歴</h2>
-    <div id="search-history">履歴はありません</div>
-  </div>
+      if (currentBoard) {
+        query = query.eq("board_slug", currentBoard);
+      }
 
-  <script type="module">
-    const searchInput = document.getElementById("search-input");
-    const historyContainer = document.getElementById("search-history");
+      if (searchKeyword) {
+        query = query.or(`title.ilike.%${searchKeyword}%,body.ilike.%${searchKeyword}%`);
+      }
 
-    // 検索履歴の保存・表示
-    function saveSearchHistory(keyword) {
-      if (!keyword) return;
-      let history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
-      history = history.filter(k => k !== keyword); // 重複排除
-      history.unshift(keyword);
-      if (history.length > 10) history = history.slice(0, 10);
-      localStorage.setItem("searchHistory", JSON.stringify(history));
-      renderSearchHistory();
-    }
+      const { data, error } = await query;
 
-    function renderSearchHistory() {
-      let history = JSON.parse(localStorage.getItem("searchHistory") || "[]");
-      if (!history.length) {
-        historyContainer.textContent = "履歴はありません";
+      if (error) {
+        container.textContent = "スレッド読み込みに失敗しました";
         return;
       }
-      historyContainer.innerHTML = "";
-      history.forEach(word => {
-        const el = document.createElement("div");
-        el.innerHTML = `<a href="board.html?search=${encodeURIComponent(word)}">${word}</a>`;
-        historyContainer.appendChild(el);
+
+      if (!data || data.length === 0) {
+        container.textContent = "スレッドが見つかりません";
+        return;
+      }
+
+      data.forEach(thread => {
+        const div = document.createElement("div");
+        div.className = "thread";
+        div.innerHTML = `<a href="thread.html?id=${thread.id}">${thread.title}</a><br>${thread.body}`;
+        container.appendChild(div);
       });
     }
 
-    // 曖昧一致で即時ジャンプ
-    searchInput.addEventListener("keypress", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const keyword = searchInput.value.trim();
-        if (keyword) {
-          saveSearchHistory(keyword);
-          window.location.href = `board.html?search=${encodeURIComponent(keyword)}`;
-        }
+    const form = document.getElementById("thread-form");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("title").value.trim();
+      const body = document.getElementById("body").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const errorDiv = document.getElementById("error");
+
+      if (!title || !body) {
+        errorDiv.textContent = "タイトルと本文は必須です。";
+        return;
       }
+
+      if (!currentBoard) {
+        errorDiv.textContent = "板を選択してください。";
+        return;
+      }
+
+      const { error } = await supabase.from("threads").insert([{
+        title,
+        body,
+        name: name || null,
+        board_slug: currentBoard
+      }]);
+
+      if (error) {
+        errorDiv.textContent = "スレッド作成に失敗しました。";
+        return;
+      }
+
+      form.reset();
+      loadThreads();
     });
 
-    renderSearchHistory();
+    loadBoards();
   </script>
 </body>
-
 </html>
