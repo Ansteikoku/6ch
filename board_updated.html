@@ -20,14 +20,14 @@
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
     const supabase = createClient(
-      "https://jusddwcwoccwzimnveys.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1c2Rkd2N3b2Njd3ppbW52ZXlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMDE1ODAsImV4cCI6MjA2Nzc3NzU4MH0.NQXUcKkOeQ898bSyUJbPTgGTdTdotcVIKV6wTVsBPjg"
+      "https://npyamxaqnmyosgpduuxl.supabase.co", // 新しいSupabase URLを組み込み
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weWFteGFxbm15b3NncGR1dXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMjAwMzUsImV4cCI6MjA2Nzc5NjAzNX0.ViqzFOpRJiOJQUdBDCV0ISloACe6b9Oa1pE_OpeefeU" // 既存の anon key
     );
 
     async function loadBoards() {
       const ul = document.getElementById("board-list");
       const { data, error } = await supabase.from("boards").select("*").order("name");
-
+      
       console.log(data, error);  // データとエラーを確認
 
       if (error || !data) {
