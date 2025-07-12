@@ -7,6 +7,7 @@
     body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
     #thread-title { font-weight: bold; font-size: 1.5em; margin-bottom: 10px; }
     #thread-body { margin-bottom: 20px; }
+    #thread-image { max-width: 300px; margin-bottom: 20px; }
     #comments { background: #fff; padding: 10px; border: 1px solid #ccc; max-height: 400px; overflow-y: auto; }
     .comment { border-bottom: 1px solid #ddd; padding: 5px 0; }
     .comment:last-child { border-bottom: none; }
@@ -16,6 +17,7 @@
 <body>
   <h1 id="thread-title">読み込み中...</h1>
   <div id="thread-body"></div>
+  <img id="thread-image" src="" alt="" style="display:none;" />
 
   <h2>コメント一覧</h2>
   <button onclick="loadComments()">🔄 コメント更新</button>
@@ -38,8 +40,10 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const threadId = urlParams.get('id');
+
     const threadTitleEl = document.getElementById('thread-title');
     const threadBodyEl = document.getElementById('thread-body');
+    const threadImageEl = document.getElementById('thread-image');
     const commentsEl = document.getElementById('comments');
     const commentForm = document.getElementById('comment-form');
 
@@ -63,6 +67,11 @@
 
       threadTitleEl.textContent = data.title;
       threadBodyEl.textContent = data.body;
+
+      if (data.image_url) {
+        threadImageEl.src = data.image_url;
+        threadImageEl.style.display = 'block';
+      }
     }
 
     async function loadComments() {
