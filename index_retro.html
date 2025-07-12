@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>６ちゃんねる - ホーム</title>
+  <style>
+    body {
+      font-family: "MS PGothic", monospace;
+      background-color: #fefefe;
+      color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .wrapper {
+      text-align: center;
+    }
+    .search-container {
+      background: #ffffdd;
+      border: 2px solid #000;
+      padding: 15px 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 2px 2px #888;
+    }
+    select, input[type="text"], button {
+      font-family: "MS PGothic", monospace;
+      font-size: 16px;
+      padding: 5px;
+      border: 1px solid #000;
+      background-color: #fff;
+    }
+    input[type="text"] {
+      width: 280px;
+    }
+    button {
+      background-color: #c0c0c0;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #aaa;
+    }
+    .link {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .link a {
+      text-decoration: none;
+      color: #0000cc;
+    }
+    .link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="search-container">
+      <select id="board-select">
+        <option value="">すべて</option>
+        <optgroup label="実況">
+          <option value="live-g">なんでも実況G</option>
+          <option value="live-j">なんでも実況J</option>
+          <option value="live-v">なんでも実況V</option>
+          <option value="live-s">なんでも実況S</option>
+          <option value="live-m">なんでも実況M</option>
+          <option value="live-u">なんでも実況U</option>
+        </optgroup>
+        <optgroup label="番組ch">
+          <option value="tv-nhk">番組ch(NHK)</option>
+          <option value="tv-tbs">番組ch(TBS)</option>
+          <option value="tv-fuji">番組ch(フジ)</option>
+          <option value="tv-ntv">番組ch(NTV)</option>
+        </optgroup>
+        <optgroup label="アニメ">
+          <option value="anime-tokusatsu">アニメ特撮実況</option>
+        </optgroup>
+        <optgroup label="スポーツ">
+          <option value="baseball">野球ch</option>
+          <option value="sports">スポーツch</option>
+        </optgroup>
+      </select>
+
+      <input type="text" id="search-box" placeholder="キーワードを入力..." />
+      <button onclick="performSearch()">検索</button>
+    </div>
+
+    <div class="link">
+      <a href="board.html">▶ 板一覧を見る</a>
+    </div>
+  </div>
+
+  <script>
+    function performSearch() {
+      const board = document.getElementById("board-select").value;
+      const keyword = document.getElementById("search-box").value.trim();
+      const query = new URLSearchParams();
+      if (board) query.append("board", board);
+      if (keyword) query.append("q", keyword);
+      window.location.href = "index.html?" + query.toString();
+    }
+  </script>
+</body>
+</html>
