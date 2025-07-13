@@ -9,22 +9,20 @@
       background-color: #fefefe;
       color: #000;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      height: 100vh;
       margin: 0;
-    }
-    .wrapper {
-      text-align: center;
+      padding: 40px;
     }
     .search-container {
       background: #ffffdd;
       border: 2px solid #000;
       padding: 15px 20px;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 10px;
       box-shadow: 2px 2px #888;
+      margin-bottom: 20px;
     }
     input[type="text"], button {
       font-family: "MS PGothic", monospace;
@@ -44,7 +42,7 @@
       background-color: #aaa;
     }
     .link {
-      margin-top: 12px;
+      margin-bottom: 20px;
       font-size: 14px;
     }
     .link a {
@@ -54,26 +52,82 @@
     .link a:hover {
       text-decoration: underline;
     }
+    #results {
+      width: 90%;
+      max-width: 700px;
+      text-align: left;
+    }
+    .thread-result {
+      border-bottom: 1px solid #ccc;
+      padding: 10px 0;
+    }
+    .thread-result a {
+      color: #0000cc;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="search-container">
-      <input type="text" id="search-box" placeholder="キーワードを入力..." />
-      <button onclick="performSearch()">検索</button>
-    </div>
-
-    <div class="link">
-      <a href="board.html">▶ 板一覧を見る</a>
-    </div>
+  <div class="search-container">
+    <input type="text" id="search-box" placeholder="キーワードを入力..." />
+    <button onclick="performSearch()">検索</button>
   </div>
 
-  <script>
+  <div class="link">
+    <a href="board.html">▶ 板一覧を見る</a>
+  </div>
+
+  <div id="results"></div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const supabase = createClient(
+      "https://npyamxaqnmyosgpduuxl.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weWFteGFxbm15b3NncGR1dXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMjAwMzUsImV4cCI6MjA2Nzc5NjAzNX0.ViqzFOpRJiOJQUdBDCV0ISloACe6b9Oa1pE_OpeefeU"
+    );
+
     function performSearch() {
       const keyword = document.getElementById("search-box").value.trim();
-      const query = new URLSearchParams();
-      if (keyword) query.append("q", keyword);
-      window.location.href = "index.html?" + query.toString();
+      if (!keyword) return;
+      searchThreads(keyword);
+    }
+
+    async function searchThreads(keyword) {
+      const resultsDiv = document.getElementById("results");
+      resultsDiv.innerHTML = "検索中...";
+
+      const { data, error } = await supabase
+        .from("threads")
+        .select("*")
+        .or(`title.ilike.%${keyword}%,body.ilike.%${keyword}%`)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        resultsDiv.innerHTML = "エラーが発生しました";
+        console.error(error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        resultsDiv.innerHTML = "一致するスレッドが見つかりません";
+        return;
+      }
+
+      resultsDiv.innerHTML = data.map(thread => `
+        <div class="thread-result">
+          <a href="thread.html?id=${thread.id}"><strong>${thread.title}</strong></a><br>
+          ${thread.body}
+        </div>
+      `).join("");
+    }
+
+    // ページ読み込み時に ?q=xxx があれば検索実行
+    const params = new URLSearchParams(location.search);
+    const q = params.get("q");
+    if (q) {
+      document.getElementById("search-box").value = q;
+      searchThreads(q);
     }
   </script>
 </body>
