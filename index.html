@@ -4,15 +4,19 @@
   <meta charset="UTF-8" />
   <title>６ちゃんねる - ホーム</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: "MS PGothic", monospace;
       background-color: #fefefe;
       color: #000;
+      margin: 0;
+      height: 100vh;
       display: flex;
       flex-direction: column;
+      justify-content: center;
       align-items: center;
-      margin: 0;
-      padding: 40px;
     }
     .search-container {
       background: #ffffdd;
@@ -22,7 +26,6 @@
       align-items: center;
       gap: 10px;
       box-shadow: 2px 2px #888;
-      margin-bottom: 20px;
     }
     input[type="text"], button {
       font-family: "MS PGothic", monospace;
@@ -42,7 +45,7 @@
       background-color: #aaa;
     }
     .link {
-      margin-bottom: 20px;
+      margin-top: 20px;
       font-size: 14px;
     }
     .link a {
@@ -53,8 +56,9 @@
       text-decoration: underline;
     }
     #results {
-      width: 90%;
+      margin-top: 40px;
       max-width: 700px;
+      width: 90%;
       text-align: left;
     }
     .thread-result {
@@ -122,7 +126,6 @@
       `).join("");
     }
 
-    // ページ読み込み時に ?q=xxx があれば検索実行
     const params = new URLSearchParams(location.search);
     const q = params.get("q");
     if (q) {
