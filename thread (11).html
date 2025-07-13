@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>６ちゃんねる - スレッド詳細</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    #thread-title { font-weight: bold; font-size: 1.5em; margin-bottom: 10px; }
+    #thread-body { margin-bottom: 20px; }
+    #comments { background: #fff; padding: 10px; border: 1px solid #ccc; max-height: 400px; overflow-y: auto; }
+    .comment { border-bottom: 1px solid #ddd; padding: 5px 0; }
+    .comment:last-child { border-bottom: none; }
+    #comment-form textarea { width: 100%; height: 80px; }
+    img.comment-img { max-width: 200px; margin-top: 5px; display: block; }
+    canvas { border: 1px solid #888; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <h1 id="thread-title">読み込み中...</h1>
+  <div id="thread-body"></div>
+
+  <h2>コメント一覧</h2>
+  <button onclick="loadComments()">🔄 コメント更新</button>
+  <div id="comments">コメントを読み込み中...</div>
+
+  <h3>コメント投稿</h3>
+  <form id="comment-form">
+    <input type="text" id="comment-name" placeholder="名前（省略可）" /><br />
+    <textarea id="comment-body" placeholder="コメント本文"></textarea><br />
+    <input type="file" id="comment-image" accept="image/*" /><br />
+    <button type="button" onclick="clearCanvas()">🧹 お絵かきクリア</button><br />
+    <canvas id="comment-canvas" width="300" height="200"></canvas><br /><br />
+    <button type="submit">コメント投稿</button>
+    <div id="error" style="color:red;font-weight:bold;"></div>
+  </form>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    const supabase = createClient(
+      "https://npyamxaqnmyosgpduuxl.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weWFteGFxbm15b3NncGR1dXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMjAwMzUsImV4cCI6MjA2Nzc5NjAzNX0.ViqzFOpRJiOJQUdBDCV0ISloACe6b9Oa1pE_OpeefeU"
+    );
+
+    const urlParams = new URLSearchParams(location.search);
+    const threadId = urlParams.get('id');
+    const threadTitleEl = document.getElementById('thread-title');
+    const threadBodyEl = document.getElementById('thread-body');
+    const commentsEl = document.getElementById('comments');
+    const commentForm = document.getElementById('comment-form');
+    const errorDiv = document.getElementById('error');
+
+    const canvas = document.getElementById('comment-canvas');
+    const ctx = canvas.getContext("2d");
+    let isDrawing = false;
+    let canvasBlank;
+
+    canvas.addEventListener("mousedown", e => {
+      isDrawing = true;
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+    });
+    canvas.addEventListener("mousemove", e => {
+      if (isDrawing) {
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+      }
+    });
+    canvas.addEventListener("mouseup", () => isDrawing = false);
+    canvas.addEventListener("mouseout", () => isDrawing = false);
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    canvasBlank = canvas.toDataURL();
+
+    if (!threadId) {
+      threadTitleEl.textContent = 'スレッドIDが指定されていません';
+      throw new Error('No thread id');
+    }
+
+    async function loadThread() {
+      const { data, error } = await supabase.from('threads').select('*').eq('id', threadId).single();
+      if (error || !data) {
+        threadTitleEl.textContent = 'スレッドが見つかりません';
+        console.error(error);
+        return;
+      }
+      threadTitleEl.textContent = escapeHtml(data.title);
+      threadBodyEl.textContent = escapeHtml(data.body);
+    }
+
+    async function loadComments() {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at');
+      if (error) {
+        commentsEl.textContent = 'コメントの読み込みに失敗';
+        console.error(error);
+        return;
+      }
+      commentsEl.innerHTML = '';
+      data.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'comment';
+        const name = escapeHtml(c.name || '名無しさん');
+        const body = escapeHtml(c.body);
+        const time = new Date(c.created_at).toLocaleString();
+        div.innerHTML = `<strong>${name}</strong> <small>${time}</small><br><pre>${body}</pre>`;
+        if (c.image_url) {
+          const img = document.createElement("img");
+          img.src = c.image_url;
+          img.className = "comment-img";
+          div.appendChild(img);
+        }
+        if (c.drawing_url) {
+          const img = document.createElement("img");
+          img.src = c.drawing_url;
+          img.className = "comment-img";
+          div.appendChild(img);
+        }
+        commentsEl.appendChild(div);
+      });
+    }
+
+    commentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorDiv.textContent = "";
+
+      const name = document.getElementById('comment-name').value || "名無しさん";
+      const body = document.getElementById('comment-body').value.trim();
+      const imageFile = document.getElementById('comment-image').files[0];
+      const hasDrawing = canvas.toDataURL() !== canvasBlank;
+      let imageUrl = null;
+      let drawingUrl = null;
+
+      if (!body && !imageFile && !hasDrawing) {
+        alert("本文または画像またはお絵かきを入力してください");
+        return;
+      }
+
+      if (imageFile) {
+        if (imageFile.size > 2 * 1024 * 1024) {
+          errorDiv.textContent = "画像は2MB以内にしてください";
+          return;
+        }
+        const ext = imageFile.name.split('.').pop();
+        const fileName = `comment_${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("post-images").upload(fileName, imageFile);
+        if (upErr) {
+          errorDiv.textContent = "画像アップロード失敗：" + upErr.message;
+          return;
+        }
+        imageUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
+      }
+
+      if (hasDrawing) {
+        const fileName = `draw_${Date.now()}.png`;
+        const blob = await (await fetch(canvas.toDataURL())).blob();
+        const { error: drawErr } = await supabase.storage.from("post-images").upload(fileName, blob);
+        if (drawErr) {
+          errorDiv.textContent = "お絵かきアップロード失敗：" + drawErr.message;
+          return;
+        }
+        drawingUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
+      }
+
+      const { error } = await supabase.from("comments").insert([{
+        thread_id: threadId,
+        name,
+        body,
+        image_url: imageUrl,
+        drawing_url: drawingUrl
+      }]);
+
+      if (error) {
+        errorDiv.textContent = "投稿に失敗しました";
+        return;
+      }
+
+      commentForm.reset();
+      clearCanvas();
+      await loadComments();
+    });
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+    }
+
+    loadThread();
+    loadComments();
+  </script>
+</body>
+</html>
