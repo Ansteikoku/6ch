@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>６ちゃんねる - ホーム</title>
+  <style>
+    body {
+      font-family: "MS PGothic", monospace;
+      background-color: #fefefe;
+      color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .wrapper {
+      text-align: center;
+    }
+    .search-container {
+      background: #ffffdd;
+      border: 2px solid #000;
+      padding: 15px 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 2px 2px #888;
+    }
+    input[type="text"], button {
+      font-family: "MS PGothic", monospace;
+      font-size: 16px;
+      padding: 5px;
+      border: 1px solid #000;
+      background-color: #fff;
+    }
+    input[type="text"] {
+      width: 300px;
+    }
+    button {
+      background-color: #c0c0c0;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #aaa;
+    }
+    .link {
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .link a {
+      text-decoration: none;
+      color: #0000cc;
+    }
+    .link a:hover {
+      text-decoration: underline;
+    }
+    ul#suggestions {
+      list-style: none;
+      margin-top: 5px;
+      padding: 0;
+      text-align: left;
+      font-size: 14px;
+    }
+    ul#suggestions li {
+      padding: 4px 8px;
+      border-bottom: 1px solid #ccc;
+    }
+    ul#suggestions li:hover {
+      background-color: #f0f0f0;
+    }
+    ul#suggestions a {
+      color: #00c;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="search-container">
+      <input type="text" id="search-box" placeholder="キーワードを入力..." />
+      <button onclick="performSearch()">検索</button>
+    </div>
+
+    <ul id="suggestions"></ul>
+
+    <div class="link">
+      <a href="board.html">▶ 板一覧を見る</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+    
+    const supabase = createClient(
+      "https://npyamxaqnmyosgpduuxl.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5weWFteGFxbm15b3NncGR1dXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMjAwMzUsImV4cCI6MjA2Nzc5NjAzNX0.ViqzFOpRJiOJQUdBDCV0ISloACe6b9Oa1pE_OpeefeU"
+    );
+
+    const searchBox = document.getElementById("search-box");
+    const suggestions = document.getElementById("suggestions");
+
+    searchBox.addEventListener("input", async () => {
+      const keyword = searchBox.value.trim();
+      if (!keyword) {
+        suggestions.innerHTML = "";
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("threads")
+        .select("id, title")
+        .ilike("title", `%${keyword}%`)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error || !data) {
+        suggestions.innerHTML = "<li>検索エラー</li>";
+        return;
+      }
+
+      suggestions.innerHTML = data.map(thread => `
+        <li>
+          <a href="thread.html?id=${thread.id}">${highlightMatch(thread.title, keyword)}</a>
+        </li>
+      `).join("");
+    });
+
+    function highlightMatch(text, keyword) {
+      const regex = new RegExp(`(${keyword})`, "ig");
+      return text.replace(regex, "<strong style='color:red;'>$1</strong>");
+    }
+
+    function performSearch() {
+      const keyword = searchBox.value.trim();
+      if (keyword) {
+        window.location.href = "index.html?q=" + encodeURIComponent(keyword);
+      }
+    }
+  </script>
+</body>
+</html>
