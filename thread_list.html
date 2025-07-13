@@ -50,7 +50,7 @@
     if (!boardSlug) {
       boardTitle.textContent = "板が指定されていません";
     } else {
-      boardTitle.textContent = `「${boardSlug}」のスレッド一覧`;
+      boardTitle.textContent = `「${escapeHtml(boardSlug)}」のスレッド一覧`;
       loadThreads();
     }
 
@@ -71,12 +71,35 @@
         const div = document.createElement("div");
         div.className = "thread";
 
-        div.innerHTML = `<a href="thread.html?id=${thread.id}" style="font-weight:bold;">${thread.title}</a><br>${thread.body}<br>`;
+        div.innerHTML = `
+          <a href="thread.html?id=${thread.id}" style="font-weight:bold;">
+            ${escapeHtml(thread.title)}
+          </a><br>
+          ${escapeHtml(thread.body)}<br>
+        `;
 
         if (thread.image_url) {
           const img = document.createElement("img");
           img.src = thread.image_url;
           div.appendChild(img);
+        }
+
+        const comments = await supabase
+          .from("comments")
+          .select("*")
+          .eq("thread_id", thread.id)
+          .order("created_at");
+
+        if (comments.data) {
+          comments.data.forEach(c => {
+            const com = document.createElement("div");
+            com.className = "comment";
+            com.innerHTML = `
+              <strong>${escapeHtml(c.name || "名無しさん")}</strong><br>
+              <pre>${escapeHtml(c.body)}</pre>
+            `;
+            div.appendChild(com);
+          });
         }
 
         threadContainer.appendChild(div);
@@ -88,15 +111,14 @@
       const errorDiv = document.getElementById("error");
       errorDiv.textContent = "";
 
-      const title = document.getElementById("title").value.trim();
-      const body = document.getElementById("body").value.trim();
+      const title = document.getElementById("title").value;
+      const body = document.getElementById("body").value;
       const name = document.getElementById("name").value || "名無しさん";
       const imageFile = document.getElementById("thread-image").files[0];
       const canvas = document.getElementById("draw-canvas");
       const hasDrawing = canvas.toDataURL() !== canvasBlankURL;
       let imageUrl = null;
 
-      // 画像ファイルアップロード
       if (imageFile) {
         const ext = imageFile.name.split(".").pop();
         const fileName = `img_${Date.now()}.${ext}`;
@@ -106,9 +128,7 @@
           return;
         }
         imageUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
-      } 
-      // お絵かきキャンバスアップロード
-      else if (hasDrawing) {
+      } else if (hasDrawing) {
         const fileName = `draw_${Date.now()}.png`;
         const blob = await (await fetch(canvas.toDataURL())).blob();
         const { error: uploadErr } = await supabase.storage.from("post-images").upload(fileName, blob);
@@ -119,7 +139,6 @@
         imageUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
       }
 
-      // スレッド挿入
       const { error } = await supabase.from("threads").insert({
         board_slug: boardSlug,
         title,
@@ -130,7 +149,6 @@
 
       if (error) {
         errorDiv.textContent = "投稿に失敗しました";
-        console.error(error);
         return;
       }
 
@@ -139,7 +157,6 @@
       await loadThreads();
     });
 
-    // お絵かき機能
     const canvas = document.getElementById("draw-canvas");
     const ctx = canvas.getContext("2d");
     let isDrawing = false;
@@ -161,7 +178,16 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    const canvasBlankURL = canvas.toDataURL(); // 空の状態を保存
+    const canvasBlankURL = canvas.toDataURL(); // 初期空状態保存
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
   </script>
 </body>
 </html>
