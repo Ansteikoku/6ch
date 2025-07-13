@@ -13,6 +13,7 @@
     .comment { margin-left: 20px; background: #fefefe; }
     .form-section { margin-top: 30px; }
     canvas { border: 1px solid #888; margin-top: 5px; }
+    img { max-width: 200px; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -25,7 +26,6 @@
       <input type="text" id="title" placeholder="タイトル" required /><br /><br />
       <textarea id="body" placeholder="本文" required></textarea><br /><br />
       <input type="text" id="name" placeholder="名前（省略可）" /><br />
-      
       <input type="file" id="thread-image" accept="image/*" /><br />
       <button type="button" onclick="clearCanvas()">🧹 お絵かきクリア</button><br />
       <canvas id="draw-canvas" width="300" height="200"></canvas><br /><br />
@@ -70,28 +70,13 @@
       for (const thread of data) {
         const div = document.createElement("div");
         div.className = "thread";
+
         div.innerHTML = `<a href="thread.html?id=${thread.id}" style="font-weight:bold;">${thread.title}</a><br>${thread.body}<br>`;
 
         if (thread.image_url) {
           const img = document.createElement("img");
           img.src = thread.image_url;
-          img.style.maxWidth = "200px";
           div.appendChild(img);
-        }
-
-        const comments = await supabase
-          .from("comments")
-          .select("*")
-          .eq("thread_id", thread.id)
-          .order("created_at");
-
-        if (comments.data) {
-          comments.data.forEach(c => {
-            const com = document.createElement("div");
-            com.className = "comment";
-            com.innerHTML = `<strong>${c.name || "名無しさん"}</strong><br><pre>${c.body}</pre>`;
-            div.appendChild(com);
-          });
         }
 
         threadContainer.appendChild(div);
@@ -103,16 +88,15 @@
       const errorDiv = document.getElementById("error");
       errorDiv.textContent = "";
 
-      const title = document.getElementById("title").value;
-      const body = document.getElementById("body").value;
+      const title = document.getElementById("title").value.trim();
+      const body = document.getElementById("body").value.trim();
       const name = document.getElementById("name").value || "名無しさん";
-            const imageFile = document.getElementById("thread-image").files[0];
-
+      const imageFile = document.getElementById("thread-image").files[0];
       const canvas = document.getElementById("draw-canvas");
       const hasDrawing = canvas.toDataURL() !== canvasBlankURL;
-
       let imageUrl = null;
 
+      // 画像ファイルアップロード
       if (imageFile) {
         const ext = imageFile.name.split(".").pop();
         const fileName = `img_${Date.now()}.${ext}`;
@@ -122,7 +106,9 @@
           return;
         }
         imageUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
-      } else if (hasDrawing) {
+      } 
+      // お絵かきキャンバスアップロード
+      else if (hasDrawing) {
         const fileName = `draw_${Date.now()}.png`;
         const blob = await (await fetch(canvas.toDataURL())).blob();
         const { error: uploadErr } = await supabase.storage.from("post-images").upload(fileName, blob);
@@ -133,16 +119,18 @@
         imageUrl = supabase.storage.from("post-images").getPublicUrl(fileName).data.publicUrl;
       }
 
+      // スレッド挿入
       const { error } = await supabase.from("threads").insert({
         board_slug: boardSlug,
         title,
         body,
-        name
+        name,
         image_url: imageUrl
       });
 
       if (error) {
         errorDiv.textContent = "投稿に失敗しました";
+        console.error(error);
         return;
       }
 
@@ -151,6 +139,7 @@
       await loadThreads();
     });
 
+    // お絵かき機能
     const canvas = document.getElementById("draw-canvas");
     const ctx = canvas.getContext("2d");
     let isDrawing = false;
@@ -172,7 +161,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    const canvasBlankURL = canvas.toDataURL(); // 初期空状態保存
+    const canvasBlankURL = canvas.toDataURL(); // 空の状態を保存
   </script>
 </body>
 </html>
