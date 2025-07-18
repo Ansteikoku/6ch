@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://ansteikoku.github.io/6ch/sitemap.xml
